@@ -26,9 +26,50 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Stack;
 
 class HttpRequestTeleService {
+
+    // out
+    PrintStream out = System.out;
+
+    // testData
+    String[][] searchList = {
+            {"Meier", "4711"},
+            {"Müller", "0815"},
+            {"Sommer", "0815"},
+            {"Gehrke", "0815"},
+            {"von Mörks", "1337"},
+            {"von Oben", "1337"},
+            {"von Unter", "1337"},
+            {"von Drüben", "1337"},
+            {"Heiko", "5488"},
+            {"Heiko", "8888"},
+            {"Heiko", "8848"},
+            {"Heiko", "8888"},
+            {"Heiko", "3433"},
+            {"Heiko", "4433"},
+            {"Heiko", "8488"},
+            {"Heiko", "8388"},
+            {"Kienöl", "2208"},
+            {"Brecht", "2014"}
+    };
+    long startTime;
+
+    private Stack<String> stack = new Stack<String>();
+
+    public HttpRequestTeleService() {
+
+    }
+
     public static void main(String[] args) throws Exception {
+        
+        HttpRequestTeleService service = null;
+        service = new HttpRequestTeleService();
+        service.start();
+    }
+
+    public void start() throws Exception {
 
         // Vereinbarungen
         // ---------------------------------------------------------
@@ -42,6 +83,7 @@ class HttpRequestTeleService {
         String zeile = null;  // Eine Zeile aus dem Socket
         String host = null;  // Der Hostname
         int port = 0;     // Der lokale Port
+        String contentLines = "";
 
         // Programmstart und Portbelegung
         // ---------------------------------------------------------
@@ -65,107 +107,238 @@ class HttpRequestTeleService {
             zeile = br.readLine();
             System.out.println("Kontrollausgabe: " + zeile);
             System.out.println("Kontrollausgabe: " + cs.getInetAddress());
-            String parameterLine = zeile.substring(zeile.indexOf("?") + 1, zeile.lastIndexOf(" "));
-            System.out.println("Kontrollausgabe: " + parameterLine);
-            String[] parameters = parameterLine.split("&");
-            System.out.println("Kontrollausgabe: " + parameters.length);
-            String[] keyValue = null;
-            for (int i=0;i<parameters.length;i++){
-                System.out.println("Kontrollausgabe: " + parameters[i]);
+
+            // Favicon-Requests nicht bearbeiten
+            // -------------------------------------------------------
+            if (zeile.startsWith("GET /?exit=Server+beenden HTTP/1.1")) {
+                System.out.println("Beende Server...");
+                br.close();
+                return;                       // stoppe server...
             }
-//            System.out.println("Kontrollausgabe: " + keyValue.length);
-
-
 
             // Favicon-Requests nicht bearbeiten
             // -------------------------------------------------------
             if (zeile.startsWith("GET /favicon")) {
-                System.out.println("Favicon-Request");
+//                System.out.println("Favicon-Request");
                 br.close();
                 continue;                       // Zum naechsten Request
             }
 
+
             // analyse request line
             if (zeile.startsWith("GET /?")) {
 
-                int nameKeyStart = zeile.indexOf('?');
-                int nameKeyEnd = zeile.indexOf('=');
-                int nameValueEnd = zeile.indexOf('&');
-                int numberKeyEnd = zeile.indexOf('=');
-                int numberValueEnd = zeile.indexOf(' ');
+                String converter = zeile.replace("GET /?", "").replace(" HTTP/1.1", "");
+                String[] param = converter.split("&");
+                String name = null;
+                String tel = null;
+                for (String aParam : param) {
+//                    System.out.println(aParam);
 
-                System.out.println("? : " + nameKeyStart);
-                System.out.println("= : " + nameKeyEnd);
-                System.out.println("& : " + nameValueEnd);
-                System.out.println("= : " + numberKeyEnd);
-                System.out.println("  : " + numberValueEnd);
+                    if (aParam.startsWith("name=")) {
+                        name = aParam.replace("name=", "");
+                        if (!name.isEmpty()) {
+//                            System.out.println(name);
+                            name = name.replace("%C3%A4", "ä")
+                                    .replace("%C3%B6", "ö")
+                                    .replace("%C3%BC", "ü")
+                                    .replace("+", " ")
+                                    .replace("%C3%9F", "ß");
+//                            System.out.println(name);
 
-                String nameKey = zeile.substring(nameKeyStart + 1, nameKeyEnd);
-                String nameValue = zeile.substring(nameKeyEnd + 1, nameValueEnd);
-//                String numberKey = zeile.substring(nameValueEnd, numberKeyEnd);
-//                String numberValue = zeile.substring(nameKeyEnd + 1, nameValueEnd - 1);
+                        }
+                    }
+                    if (aParam.startsWith("tel=")) {
+                        tel = aParam.replace("tel=", "");
+                    }
+                }
 
-                System.out.println(nameKey + " : " + nameValue);
-//                System.out.println(numberKey + " : " + "numberValue");
-//                System.out.print("Found Index :" );
-//                System.out.println(zeile.indexOf( '?' ));
-//                System.out.print("Found Index :" );
-//                System.out.println(zeile.indexOf( '=' ));
-//                System.out.print("Found Index :" );
-//                System.out.println(zeile.indexOf( '&' ));
-//                System.out.print("Found Index :" );
-//                System.out.println(zeile.indexOf( '=' ));
+                Thread threadSearchName = null;
+                Thread threadSearchNr = null;
+
+                // check if name not null & not empty -> start thread
+                if (name != null && !name.isEmpty()) {
+
+                    // init search thread
+                    SearchThread searchThread = new SearchThread(stack, name, 0, searchList, startTime);
+                    threadSearchName = new Thread(searchThread);
+                    threadSearchName.start();
+                    out.println("Searching for a Name (" + name + ") in " + threadSearchName.getName());
+                }
+                // check if nr not null & not empty -> start thread
+                if (tel != null && !tel.isEmpty()) {
+
+                    // init search thread
+                    SearchThread searchThread = new SearchThread(stack, tel, 1, searchList, startTime);
+                    threadSearchNr = new Thread(searchThread);
+                    threadSearchNr.start();
+                    out.println("Searching for Number (" + tel + ") in " + threadSearchNr.getName());
+                }
+                // join thread when alive
+                if (threadSearchName != null && threadSearchName.isAlive()) {
+                    threadSearchName.join();
+                }
+                // join thread when alive
+                if (threadSearchNr != null && threadSearchNr.isAlive()) {
+                    threadSearchNr.join();
+                }
+
+                long endTime = System.nanoTime();
+
+                // print result if something found
+                if (stack.size() >= 1) {
+
+                    out.println("\nFound " + stack.size() + " entrys...");
+                    contentLines = "<table>";
+                    contentLines += "<tr><td>Found " + stack.size() + " entrys...</td></tr>";
+
+                    out.printf("\n\t%-20s %-10s %-10s %-20s %-10s\n", "Name", "Nummer", "Thread", "SearchValue", "Time");
+                    out.printf("\t%s \n", "--------------------------------------------------------------------");
+                    contentLines += "<tr><td>Name</td><td>Nummer</td><td>Thread</td><td>SearchValue</td><td>Time</td></tr>";
+
+
+                    while (!stack.isEmpty()) {
+                        String[] result = stack.pop().split(";");
+                        out.printf("\t%-20s %-10s %-10s %-20s %-10s\n", result[0], result[1], result[2], result[3], result[4]);
+                        contentLines += "<tr><td>" + result[0] + "</td><td>" + result[1] + "</td><td>" + result[2] + "</td><td>" + result[3] + "</td><td>" + result[4] + "</td></tr>";
+                    }
+                    contentLines += "</table>";
+                    contentLines += "<FORM><INPUT Type=\"button\" VALUE=\"Back\" onClick=\"history.go(-1);return true;\"></FORM>";
+
+                    out.println("\n\tSearch duration : " + ((endTime - startTime) / 1000000) + "ms (" + endTime + ")");
+                    System.out.println("Request wird bearbeitet");
+                    os = cs.getOutputStream();
+                    pw = new PrintWriter(os);
+
+
+                    pw.println("HTTP/1.1 200 OK");               // Der Header
+                    pw.println("Content-Type: text/html");
+                    pw.println();
+                    pw.println(htmlBuild(contentLines));
+                    pw.println();
+                    pw.flush();
+                    pw.close();
+                    br.close();
+
+
+                } else {
+                    out.println("\n\tSearch for \" searchLine  \" was failed : no results");
+                    System.out.println("Request wird bearbeitet");
+                    os = cs.getOutputStream();
+                    pw = new PrintWriter(os);
+                    contentLines = "<h2 align=center>Telefonverzeichnis<h2>";
+                    contentLines += "<h3>Sie können nach Name oder nach Telefonnummer oder nach beiden (nebenläufig) suchen.</h3>";
+                    contentLines += "<form method=get action=\"http://MuckAsi-LaPPi:9876\">";
+                    contentLines += "<table>";
+                    contentLines += "<tr><td valign=top>Name:</td>";
+                    contentLines += "<td><input type=search name=name title=\"Format <br> String + String\" placeholder=\"String + String(optional)\"></td>";
+                    contentLines += "<tr><td valign=top>Tel:</td>";
+                    contentLines += "<td><input type=\"search\" name=\"tel\" title=\"Format <br> Number\" placeholder=\"Number\"></td>";
+                    contentLines += "</tr><tr>";
+                    contentLines += "<td valign=top><input type=submit value=Suchen></td>";
+                    contentLines += "<td><input type=reset></td>";
+                    contentLines += "</tr>";
+                    contentLines += "</table>";
+                    contentLines += "</form>";
+
+                    contentLines += "<form method=get action=\"http://MuckAsi-LaPPi:9876\">";
+                    contentLines += "<input name=exit type=submit value=\"Server beenden\" >";
+                    contentLines += "</form>";
+
+                    contentLines += "<p>No Results!</p>";
+
+                    pw.println("HTTP/1.1 200 OK");               // Der Header
+                    pw.println("Content-Type: text/html");
+                    pw.println();
+                    pw.println(htmlBuild(contentLines));
+                    pw.println();
+                    pw.flush();
+                    pw.close();
+                    br.close();
+                }
+
+            } else {
+
+
+                // Den Request bearbeiten (Hier: nur zuruecksenden)
+                // -------------------------------------------------------
+                System.out.println("Request wird bearbeitet");
+                os = cs.getOutputStream();
+                pw = new PrintWriter(os);
+                contentLines = "<h2 align=center>Telefonverzeichnis<h2>";
+                contentLines += "<h3>Sie können nach Name oder nach Telefonnummer oder nach beiden (nebenläufig) suchen.</h3>";
+                contentLines += "<form method=get action=\"http://MuckAsi-LaPPi:9876\">";
+                contentLines += "<table>";
+                contentLines += "<tr><td valign=top>Name:</td>";
+                contentLines += "<td><input type=search name=name title=\"Format <br> String + String\" placeholder=\"String + String(optional)\"></td>";
+                contentLines += "<tr><td valign=top>Tel:</td>";
+                contentLines += "<td><input type=\"search\" name=\"tel\" title=\"Format <br> Number\" placeholder=\"Number\"></td>";
+                contentLines += "</tr><tr>";
+                contentLines += "<td valign=top><input type=submit value=Suchen></td>";
+                contentLines += "<td><input type=reset></td>";
+                contentLines += "</tr>";
+                contentLines += "</table>";
+                contentLines += "</form>";
+
+                contentLines += "<form method=get action=\"http://MuckAsi-LaPPi:9876\">";
+                contentLines += "<input name=exit type=submit value=\"Server beenden\" >";
+                contentLines += "</form>";
+
+                pw.println("HTTP/1.1 200 OK");               // Der Header
+                pw.println("Content-Type: text/html");
+                pw.println();
+                pw.println(htmlBuild(contentLines));
+                pw.println();
+                pw.flush();
+                pw.close();
+                br.close();
             }
-
-            // Den Request bearbeiten (Hier: nur zuruecksenden)
-            // -------------------------------------------------------
-            System.out.println("Request wird bearbeitet");
-            os = cs.getOutputStream();
-            pw = new PrintWriter(os);
-            String firstSite =
-                    "<html>\n" +
-                            "<head><meta charset=\"utf-8\"> </head>\n" +
-                            "<body>\n" +
-                            "<h2 align=center>Telefonverzeichnis</h2>\n" +
-                            "<h3>Sie können nach Name oder nach Telefonnummer oder nach beiden (nebenläufig) suchen.</h3>\n" +
-                            "<form method=get action=\"http://MuckAsi-LaPPi:9876\">\n" +
-                            "<table>\n" +
-                            "<tr> " +
-                            "   <td valign=top>Name:</td>    " +
-                            "   <td>" +
-                            "       <input type=\"search\" " +
-                            "               name=\"name\" " +
-                            "               title=\"Format <br> String + String\" " +
-                            "               placeholder=\"String + String(optional)\"" +
-                            "               >" +
-                            "</td>    <td></td> </tr>\n" +
-                            "<tr> <td valign=top>Nummer:</td> <td><input type=\"search\" name=\"tel\" title=\"Format <br> Number\" placeholder=\"Number\">" +
-                            "</td>    <td></td> </tr>\n" +
-                            "<tr> " +
-                            "<td valign=top><input type=submit value=Suchen></td>\n" +
-                            "<td><input type=reset></td>\n" +
-                            "<td><input name=exit type=submit value=\"Server beenden\" ></td> " +
-                            "</tr>\n" +
-                            "</table>\n" +
-                            "</form>\n" +
-                            "</body>\n" +
-                            "</html>";
-
-            pw.println("HTTP/1.1 200 OK");               // Der Header
-            pw.println("Content-Type: text/html");
-            pw.println();
-//            pw.println("<html>");                    // Die HTML-Seite
-//            pw.println("<body>");
-//            pw.println("<h1><font color=green>");
-//            pw.println(zeile);
-//            pw.println("</font></h1>");
-//            pw.println("</body>");
-//            pw.println("</html>");
-            pw.println(firstSite);
-            pw.println();
-            pw.flush();
-            pw.close();
-            br.close();
         }  // end while
     }  // end main()
+
+    private String htmlBuild(String content) {
+        String htmlHead = "<html><head><meta charset=\"utf-8\"></head><body>";
+        String htmlFooter = "</body></html>";
+        return htmlHead + content + htmlFooter;
+    }
 }  // end class
+
+class SearchThread implements Runnable {
+
+    private final int cell;
+    // out
+    PrintStream out = System.out;
+    private final long startTime;
+    protected final Stack<String> stack;
+    private final String searchValue;
+    private final String[][] searchData;
+
+    public SearchThread(Stack<String> stack, String searchValue, int cell, String[][] searchData, long startTime) {
+        this.stack = stack;
+        this.searchValue = searchValue;
+        this.searchData = searchData;
+        this.startTime = startTime;
+        this.cell = cell;
+    }
+
+    @Override
+    public void run() {
+
+        String threadName = Thread.currentThread().getName();
+
+        // thread name
+//        out.println(Thread.currentThread().getName());
+
+        // search data cell
+        for (String[] searchRow : searchData) {
+
+            // search for searchValue
+            if (searchRow[cell].equals(searchValue)) {
+
+                stack.add(searchRow[0] + ";" + searchRow[1] + ";" + threadName + ";" + searchValue + ";" + ((System.nanoTime() - startTime) / 1000000)
+                        + "ms");
+
+            }
+        }
+    }
+}
