@@ -108,6 +108,7 @@ class HttpRequestTeleService {
             isr = new InputStreamReader(is);
             br = new BufferedReader(isr);
             zeile = br.readLine();
+
             System.out.println("Kontrollausgabe: " + zeile);
             System.out.println("Kontrollausgabe: " + cs.getInetAddress());
 
@@ -191,7 +192,7 @@ class HttpRequestTeleService {
                     contentLines += "<p>Wrong Input - Tel is not a Number!</p>";
 
                     pw.println("HTTP/1.1 200 OK");               // Der Header
-                    pw.println("Content-Type: text/html");
+                    pw.println("Content-Type: text/html;charset=utf-8");
                     pw.println();
                     pw.println(htmlBuild(contentLines));
                     pw.println();
@@ -261,7 +262,7 @@ class HttpRequestTeleService {
 
 
                         pw.println("HTTP/1.1 200 OK");               // Der Header
-                        pw.println("Content-Type: text/html");
+                        pw.println("Content-Type: text/html;charset=utf-8");
                         pw.println();
                         pw.println(htmlBuild(contentLines));
                         pw.println();
@@ -297,7 +298,7 @@ class HttpRequestTeleService {
                         contentLines += "<p>No Results!</p>";
 
                         pw.println("HTTP/1.1 200 OK");               // Der Header
-                        pw.println("Content-Type: text/html");
+                        pw.println("Content-Type: text/html;charset=utf-8");
                         pw.println();
                         pw.println(htmlBuild(contentLines));
                         pw.println();
@@ -335,7 +336,7 @@ class HttpRequestTeleService {
                 contentLines += "</form>";
 
                 pw.println("HTTP/1.1 200 OK");               // Der Header
-                pw.println("Content-Type: text/html");
+                pw.println("Content-Type: text/html;charset=utf-8");
                 pw.println();
                 pw.println(htmlBuild(contentLines));
                 pw.println();
@@ -347,7 +348,7 @@ class HttpRequestTeleService {
     }  // end main()
 
     private String htmlBuild(String content) {
-        String htmlHead = "<html><head><meta charset=\"utf-8\"></head><body>";
+        String htmlHead = "<html><head><meta charset=utf-8></head><body>";
         String htmlFooter = "</body></html>";
         return htmlHead + content + htmlFooter;
     }
