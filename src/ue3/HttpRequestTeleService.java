@@ -1,4 +1,4 @@
-//package ue2;
+package ue3;//package ue2;
 
 
 /**
@@ -33,6 +33,7 @@ class HttpRequestTeleService {
     // out
     PrintStream out = System.out;
 
+    // TODO - SEARCHLIST TO RMI SERVER
     // testData
     String[][] searchList = {
             {"Meier", "4711"},
@@ -218,7 +219,7 @@ class HttpRequestTeleService {
                     br.close();
                 } else {
 
-
+                    // TODO - RMI SERVER INTERACTION
                     Thread threadSearchName = null;
                     Thread threadSearchNr = null;
 
@@ -255,6 +256,10 @@ class HttpRequestTeleService {
 
                     long endTime = System.nanoTime();
 
+                    // END RMI SERVER INTERACTION
+
+
+                    // TODO - GET RESULT OF RMI SERVER
                     // print result if something found
                     if (stack.size() >= 1) {
 
@@ -406,7 +411,9 @@ class HttpRequestTeleService {
         return htmlHead + content + htmlFooter;
     }
 }  // end class
+// END HTTP Server && RMI CLIENT
 
+// TODO - THIS IS RMI SERVER PART
 class SearchThread implements Runnable {
 
     private final int cell;
@@ -446,3 +453,4 @@ class SearchThread implements Runnable {
         }
     }
 }
+// END RMI SERVER PART
